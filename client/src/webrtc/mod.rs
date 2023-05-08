@@ -1,16 +1,15 @@
 mod crates;
+pub mod data_channel;
 
 // re-export sub-crates
-pub(crate) use crates::dtls;
-pub(crate) use crates::ice;
-pub(crate) use crates::sctp;
-pub(crate) use crates::sdp;
-pub(crate) use crates::stun;
-pub(crate) use crates::util;
-pub(crate) use data_channel::internal;
+pub use crates::dtls;
+pub use crates::ice;
+pub use crates::sctp;
+pub use crates::sdp;
+pub use crates::stun;
+pub use crates::util;
 
 pub(crate) mod api;
-pub(crate) mod data_channel;
 pub(crate) mod dtls_transport;
 pub(crate) mod error;
 pub(crate) mod ice_transport;

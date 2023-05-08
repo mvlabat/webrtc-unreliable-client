@@ -18,8 +18,15 @@ async fn main() -> Result<()> {
     let server_address = "127.0.0.1";
     let server_url = format!("http://{}:14191/rtc_session", server_address);
 
-    let (socket, socket_io) = Socket::new();
-    socket.connect(server_url.as_str()).await;
+    let socket_io = loop {
+        let (socket, socket_io) = Socket::new();
+        if let Err(err) = socket.connect(server_url.as_str()).await {
+            log::warn!("Could not send request, original error: {err:?}");
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            continue;
+        }
+        break socket_io;
+    };
 
     let addr_cell_1 = socket_io.addr_cell.clone();
     let addr_cell_2 = socket_io.addr_cell.clone();

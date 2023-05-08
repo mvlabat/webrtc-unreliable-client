@@ -5,11 +5,11 @@ use std::net;
 use std::num::ParseIntError;
 use std::time::SystemTimeError;
 
-pub(crate) type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum Error {
+pub enum Error {
     /// Indicates local username fragment insufficient bits are provided.
     /// Have to be at least 24 bits long.
     #[error("local username fragment is less than 24 bits long")]
@@ -120,7 +120,7 @@ pub(crate) enum Error {
 
 #[derive(Debug, Error)]
 #[error("io error: {0}")]
-pub(crate) struct IoError(#[from] pub(crate) io::Error);
+pub struct IoError(#[from] pub io::Error);
 
 // Workaround for wanting PartialEq for io::Error.
 impl PartialEq for IoError {

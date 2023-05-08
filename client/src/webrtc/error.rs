@@ -6,11 +6,11 @@ use std::string::FromUtf8Error;
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError as MpscSendError;
 
-pub(crate) type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Error, Debug, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum Error {
+pub enum Error {
     /// ErrConnectionClosed indicates an operation executed after connection
     /// has already been closed.
     #[error("connection closed")]
@@ -102,7 +102,7 @@ pub(crate) enum Error {
     #[error("{0}")]
     Dtls(#[from] crate::webrtc::dtls::Error),
     #[error("{0}")]
-    Data(#[from] crate::webrtc::internal::Error),
+    Data(#[from] crate::webrtc::data_channel::Error),
     #[error("{0}")]
     Sctp(#[from] crate::webrtc::sctp::Error),
     #[error("{0}")]

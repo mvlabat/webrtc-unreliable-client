@@ -12,4 +12,4 @@ pub(crate) mod url;
 pub(crate) mod use_candidate;
 mod util;
 
-pub(crate) use error::Error;
+pub use error::*;

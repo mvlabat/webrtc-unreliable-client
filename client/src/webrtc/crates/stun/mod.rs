@@ -13,4 +13,4 @@ pub(crate) mod uattrs;
 pub(crate) mod uri;
 pub(crate) mod xoraddr;
 
-pub(crate) use error::Error;
+pub use error::*;

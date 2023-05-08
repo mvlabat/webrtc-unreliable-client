@@ -6,11 +6,11 @@ use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 use thiserror::Error;
 
-pub(crate) type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Error, Debug, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum Error {
+pub enum Error {
     #[error("buffer: full")]
     ErrBufferFull,
     #[error("buffer: closed")]
@@ -140,7 +140,7 @@ impl Error {
 
 #[derive(Debug, Error)]
 #[error("io error: {0}")]
-pub(crate) struct IoError(#[from] pub(crate) io::Error);
+pub struct IoError(#[from] pub(crate) io::Error);
 
 // Workaround for wanting PartialEq for io::Error.
 impl PartialEq for IoError {
@@ -165,7 +165,7 @@ impl From<io::Error> for Error {
 /// By using `util::Error::from_std` we can preserve the underlying error (and stack trace!).
 #[derive(Debug, Error)]
 #[error("{0}")]
-pub(crate) struct StdError(pub(crate) Box<dyn std::error::Error + Send + Sync>);
+pub struct StdError(pub Box<dyn std::error::Error + Send + Sync>);
 
 impl PartialEq for StdError {
     fn eq(&self, _: &Self) -> bool {

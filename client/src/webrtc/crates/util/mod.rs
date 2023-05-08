@@ -26,7 +26,7 @@ pub(crate) trait KeyingMaterialExporter {
 /// srtp and dtls.
 #[derive(Debug, Error, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum KeyingMaterialExporterError {
+pub enum KeyingMaterialExporterError {
     #[error("tls handshake is in progress")]
     HandshakeInProgress,
     #[error("context is not supported for export_keying_material")]
@@ -56,4 +56,4 @@ pub(crate) use crate::webrtc::util::buffer::Buffer;
 pub(crate) use crate::webrtc::util::conn::Conn;
 
 mod error;
-pub(crate) use error::Error;
+pub use error::*;

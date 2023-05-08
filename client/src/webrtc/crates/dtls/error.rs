@@ -6,11 +6,11 @@ use std::io;
 use std::string::FromUtf8Error;
 use tokio::sync::mpsc::error::SendError as MpscSendError;
 
-pub(crate) type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum Error {
+pub enum Error {
     #[error("conn is closed")]
     ErrConnClosed,
     #[error("read/write timeout")]
@@ -126,7 +126,7 @@ pub(crate) enum Error {
 
 #[derive(Debug, Error)]
 #[error("io error: {0}")]
-pub(crate) struct IoError(#[from] pub(crate) io::Error);
+pub struct IoError(#[from] pub io::Error);
 
 // Workaround for wanting PartialEq for io::Error.
 impl PartialEq for IoError {
@@ -143,7 +143,7 @@ impl From<io::Error> for Error {
 
 #[derive(Debug, Error)]
 #[error("{0}")]
-pub(crate) struct P256Error(#[source] p256::elliptic_curve::Error);
+pub struct P256Error(#[source] p256::elliptic_curve::Error);
 
 impl PartialEq for P256Error {
     fn eq(&self, _: &Self) -> bool {

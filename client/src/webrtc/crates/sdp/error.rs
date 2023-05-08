@@ -4,11 +4,11 @@ use std::io;
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 
-pub(crate) type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Error, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum Error {
+pub enum Error {
     #[error("{0}")]
     Io(#[source] IoError),
     #[error("utf-8 error: {0}")]
@@ -27,7 +27,7 @@ pub(crate) enum Error {
 
 #[derive(Debug, Error)]
 #[error("io error: {0}")]
-pub(crate) struct IoError(#[from] pub(crate) io::Error);
+pub struct IoError(#[from] pub(crate) io::Error);
 
 // Workaround for wanting PartialEq for io::Error.
 impl PartialEq for IoError {

@@ -9,4 +9,4 @@ pub(crate) mod stream;
 pub(crate) mod timer;
 pub(crate) mod util;
 
-pub(crate) use error::Error;
+pub use error::*;

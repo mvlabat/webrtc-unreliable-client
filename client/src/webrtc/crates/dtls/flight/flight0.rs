@@ -30,7 +30,7 @@ impl Flight for Flight0 {
         state: &mut State,
         cache: &HandshakeCache,
         cfg: &HandshakeConfig,
-    ) -> Result<Box<dyn Flight + Send + Sync>, (Option<Alert>, Option<Error>)> {
+    ) -> std::result::Result<Box<dyn Flight + Send + Sync>, (Option<Alert>, Option<Error>)> {
         let (seq, msgs) = match cache
             .full_pull_map(
                 0,
@@ -184,7 +184,7 @@ impl Flight for Flight0 {
         state: &mut State,
         _cache: &HandshakeCache,
         _cfg: &HandshakeConfig,
-    ) -> Result<Vec<Packet>, (Option<Alert>, Option<Error>)> {
+    ) -> std::result::Result<Vec<Packet>, (Option<Alert>, Option<Error>)> {
         // Initialize
         state.cookie = vec![0; COOKIE_LENGTH];
         rand::thread_rng().fill(state.cookie.as_mut_slice());

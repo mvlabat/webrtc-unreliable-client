@@ -1,11 +1,10 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
-use anyhow::{Error, Result};
 use bytes::Bytes;
-use log::warn;
 use reqwest::{Client as HttpClient, Response};
+use thiserror::Error;
 use tinyjson::JsonValue;
-use tokio::{sync::mpsc, time::sleep};
+use tokio::sync::mpsc;
 
 use crate::webrtc::{
     data_channel::internal::data_channel::DataChannel,
@@ -28,6 +27,15 @@ pub struct SocketIo {
     pub to_client_receiver: mpsc::UnboundedReceiver<Box<[u8]>>,
 }
 
+#[derive(Error, Debug)]
+#[non_exhaustive]
+pub enum SocketConnectionError {
+    #[error("webrtc error")]
+    WebrtcError(crate::webrtc::error::Error),
+    #[error("session request error")]
+    SessionRequestError(reqwest::Error),
+}
+
 impl Socket {
     pub fn new() -> (Self, SocketIo) {
         let addr_cell = AddrCell::default();
@@ -48,7 +56,7 @@ impl Socket {
         )
     }
 
-    pub async fn connect(self, server_url: &str) {
+    pub async fn connect(self, server_url: &str) -> Result<(), SocketConnectionError> {
         let Self {
             addr_cell,
             to_server_receiver,
@@ -70,7 +78,7 @@ impl Socket {
         // datachannel on_error callback
         data_channel
             .on_error(Box::new(move |error| {
-                println!("data channel error: {:?}", error);
+                log::warn!("data channel error: {:?}", error);
                 Box::pin(async {})
             }))
             .await;
@@ -81,6 +89,8 @@ impl Socket {
             .on_open(Box::new(move || {
                 let data_channel_ref_2 = Arc::clone(&data_channel_ref);
                 Box::pin(async move {
+                    // The `detach` call can fail only if the channel isn't opened yet,
+                    // but we are in the `on_open` handler, hence the panic.
                     let detached_data_channel = data_channel_ref_2
                         .detach()
                         .await
@@ -109,13 +119,13 @@ impl Socket {
         let offer = peer_connection
             .create_offer()
             .await
-            .expect("cannot create offer");
+            .map_err(SocketConnectionError::WebrtcError)?;
 
         // sets the LocalDescription, and starts our UDP listeners
         peer_connection
             .set_local_description(offer)
             .await
-            .expect("cannot set local description");
+            .map_err(SocketConnectionError::WebrtcError)?;
 
         // send a request to server to initiate connection (signaling, essentially)
         let http_client = HttpClient::new();
@@ -125,23 +135,21 @@ impl Socket {
         let sdp_len = sdp.len();
 
         // wait to receive a response from server
-        let response: Response = loop {
+        let response: Response = {
             let request = http_client
                 .post(server_url)
                 .header("Content-Length", sdp_len)
                 .body(sdp.clone());
 
-            match request.send().await {
-                Ok(resp) => {
-                    break resp;
-                }
-                Err(err) => {
-                    warn!("Could not send request, original error: {:?}", err);
-                    sleep(Duration::from_secs(1)).await;
-                }
-            };
+            request
+                .send()
+                .await
+                .map_err(SocketConnectionError::SessionRequestError)?
         };
-        let response_string = response.text().await.unwrap();
+        let response_string = response
+            .text()
+            .await
+            .map_err(SocketConnectionError::SessionRequestError)?;
 
         // parse session from server response
         let session_response: JsSessionResponse = get_session_response(response_string.as_str());
@@ -153,19 +161,19 @@ impl Socket {
         peer_connection
             .set_remote_description(session_description)
             .await
-            .expect("cannot set remote description");
+            .map_err(SocketConnectionError::WebrtcError)?;
 
         addr_cell
             .receive_candidate(session_response.candidate.candidate.as_str())
             .await;
 
         // add ice candidate to connection
-        if let Err(error) = peer_connection
+        peer_connection
             .add_ice_candidate(session_response.candidate.candidate)
             .await
-        {
-            panic!("Error during add_ice_candidate: {:?}", error);
-        }
+            .map_err(SocketConnectionError::WebrtcError)?;
+
+        Ok(())
     }
 }
 
@@ -173,23 +181,18 @@ impl Socket {
 async fn read_loop(
     data_channel: Arc<DataChannel>,
     to_client_sender: mpsc::UnboundedSender<Box<[u8]>>,
-) -> Result<()> {
+) -> Result<(), mpsc::error::SendError<Box<[u8]>>> {
     let mut buffer = vec![0u8; MESSAGE_SIZE];
     loop {
         let message_length = match data_channel.read(&mut buffer).await {
             Ok(length) => length,
             Err(err) => {
-                println!("Datachannel closed; Exit the read_loop: {}", err);
+                log::debug!("Datachannel closed; Exit the read_loop: {}", err);
                 return Ok(());
             }
         };
 
-        match to_client_sender.send(buffer[..message_length].into()) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(Error::new(e));
-            }
-        }
+        to_client_sender.send(buffer[..message_length].into())?;
     }
 }
 
@@ -197,15 +200,10 @@ async fn read_loop(
 async fn write_loop(
     data_channel: Arc<DataChannel>,
     mut to_server_receiver: mpsc::UnboundedReceiver<Box<[u8]>>,
-) -> Result<()> {
+) -> crate::webrtc::data_channel::Result<()> {
     loop {
         if let Some(write_message) = to_server_receiver.recv().await {
-            match data_channel.write(&Bytes::from(write_message)).await {
-                Ok(_) => {}
-                Err(e) => {
-                    return Err(Error::new(e));
-                }
-            }
+            data_channel.write(&Bytes::from(write_message)).await?;
         } else {
             return Ok(());
         }

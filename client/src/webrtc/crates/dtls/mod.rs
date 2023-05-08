@@ -21,7 +21,7 @@ pub(crate) mod record_layer;
 pub(crate) mod signature_hash_algorithm;
 pub(crate) mod state;
 
-pub(crate) use error::Error;
+pub use error::*;
 
 use cipher_suite::*;
 use extension::extension_use_srtp::SrtpProtectionProfile;
@@ -29,7 +29,7 @@ use extension::extension_use_srtp::SrtpProtectionProfile;
 pub(crate) fn find_matching_srtp_profile(
     a: &[SrtpProtectionProfile],
     b: &[SrtpProtectionProfile],
-) -> Result<SrtpProtectionProfile, ()> {
+) -> std::result::Result<SrtpProtectionProfile, ()> {
     for a_profile in a {
         for b_profile in b {
             if a_profile == b_profile {
@@ -43,7 +43,7 @@ pub(crate) fn find_matching_srtp_profile(
 pub(crate) fn find_matching_cipher_suite(
     a: &[CipherSuiteId],
     b: &[CipherSuiteId],
-) -> Result<CipherSuiteId, ()> {
+) -> std::result::Result<CipherSuiteId, ()> {
     for a_suite in a {
         for b_suite in b {
             if a_suite == b_suite {

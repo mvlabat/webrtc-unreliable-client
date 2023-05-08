@@ -1,6 +1,8 @@
 pub(crate) mod data_channel_state;
 pub(crate) mod internal;
 
+pub use internal::error::*;
+
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
@@ -11,7 +13,7 @@ use tokio::sync::Mutex;
 
 use data_channel_state::RTCDataChannelState;
 
-use crate::webrtc::error::{Error, OnErrorHdlrFn, Result};
+use crate::webrtc::error::OnErrorHdlrFn;
 use crate::webrtc::sctp_transport::RTCSctpTransport;
 
 pub(crate) type OnOpenHdlrFn =
@@ -42,7 +44,7 @@ pub(crate) struct RTCDataChannel {
     on_buffered_amount_low: Mutex<Option<OnBufferedAmountLowFn>>,
 
     sctp_transport: Mutex<Option<Weak<RTCSctpTransport>>>,
-    data_channel: Mutex<Option<Arc<crate::webrtc::internal::data_channel::DataChannel>>>,
+    data_channel: Mutex<Option<Arc<internal::data_channel::DataChannel>>>,
 }
 
 impl RTCDataChannel {
@@ -52,13 +54,21 @@ impl RTCDataChannel {
             label: label.to_string(),
             protocol: protocol.to_string(),
             ready_state: Arc::new(AtomicU8::new(RTCDataChannelState::Connecting as u8)),
+            buffered_amount_low_threshold: Default::default(),
             detach_called: Arc::new(AtomicBool::new(false)),
-            ..Default::default()
+            on_open_handler: Arc::new(Default::default()),
+            on_error_handler: Arc::new(Default::default()),
+            on_buffered_amount_low: Default::default(),
+            sctp_transport: Default::default(),
+            data_channel: Default::default(),
         }
     }
 
     /// open opens the datachannel over the sctp transport
-    pub(crate) async fn open(&self, sctp_transport: Arc<RTCSctpTransport>) -> Result<()> {
+    pub(crate) async fn open(
+        &self,
+        sctp_transport: Arc<RTCSctpTransport>,
+    ) -> crate::webrtc::error::Result<()> {
         if let Some(association) = sctp_transport.association().await {
             {
                 let mut st = self.sctp_transport.lock().await;
@@ -69,13 +79,12 @@ impl RTCDataChannel {
                 }
             }
 
-            let cfg = crate::webrtc::internal::data_channel::Config {
+            let cfg = internal::data_channel::Config {
                 label: self.label.clone(),
                 protocol: self.protocol.clone(),
             };
 
-            let dc = crate::webrtc::internal::data_channel::DataChannel::dial(&association, 0, cfg)
-                .await?;
+            let dc = internal::data_channel::DataChannel::dial(&association, 0, cfg).await?;
 
             // buffered_amount_low_threshold and on_buffered_amount_low might be set earlier
             dc.set_buffered_amount_low_threshold(
@@ -92,7 +101,7 @@ impl RTCDataChannel {
 
             Ok(())
         } else {
-            Err(Error::ErrSCTPNotEstablished)
+            Err(crate::webrtc::error::Error::ErrSCTPNotEstablished)
         }
     }
 
@@ -130,10 +139,7 @@ impl RTCDataChannel {
         });
     }
 
-    pub(crate) async fn handle_open(
-        &self,
-        dc: Arc<crate::webrtc::internal::data_channel::DataChannel>,
-    ) {
+    pub(crate) async fn handle_open(&self, dc: Arc<internal::data_channel::DataChannel>) {
         {
             let mut data_channel = self.data_channel.lock().await;
             *data_channel = Some(Arc::clone(&dc));
@@ -160,14 +166,14 @@ impl RTCDataChannel {
     /// resulting DataChannel object.
     pub(crate) async fn detach(
         &self,
-    ) -> Result<Arc<crate::webrtc::internal::data_channel::DataChannel>> {
+    ) -> crate::webrtc::error::Result<Arc<internal::data_channel::DataChannel>> {
         let data_channel = self.data_channel.lock().await;
         if let Some(dc) = &*data_channel {
             self.detach_called.store(true, Ordering::SeqCst);
 
             Ok(Arc::clone(dc))
         } else {
-            Err(Error::ErrDetachBeforeOpened)
+            Err(crate::webrtc::error::Error::ErrDetachBeforeOpened)
         }
     }
 
